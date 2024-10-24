@@ -30,13 +30,8 @@ contract TestGasPriceFeesHook is Test, Deployers {
         deployMintAndApprove2Currencies();
 
         // Deploy our hook with the proper flags
-        address hookAddress = address(
-            uint160(
-                Hooks.BEFORE_INITIALIZE_FLAG |
-                    Hooks.BEFORE_SWAP_FLAG |
-                    Hooks.AFTER_SWAP_FLAG
-            )
-        );
+        address hookAddress =
+            address(uint160(Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG));
 
         // Set gas price = 10 gwei and deploy our hook
         vm.txGasPrice(10 gwei);
@@ -44,7 +39,7 @@ contract TestGasPriceFeesHook is Test, Deployers {
         hook = GasPriceFeesHook(hookAddress);
 
         // Initialize a pool
-        (key, ) = initPool(
+        (key,) = initPool(
             currency0,
             currency1,
             hook,
@@ -67,8 +62,8 @@ contract TestGasPriceFeesHook is Test, Deployers {
 
     function test_feeUpdatesWithGasPrice() public {
         // Set up our swap parameters
-        PoolSwapTest.TestSettings memory testSettings = PoolSwapTest
-            .TestSettings({takeClaims: false, settleUsingBurn: false});
+        PoolSwapTest.TestSettings memory testSettings =
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false});
 
         IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
             zeroForOne: true,
@@ -95,8 +90,7 @@ contract TestGasPriceFeesHook is Test, Deployers {
         uint256 balanceOfToken1Before = currency1.balanceOfSelf();
         swapRouter.swap(key, params, testSettings, ZERO_BYTES);
         uint256 balanceOfToken1After = currency1.balanceOfSelf();
-        uint256 outputFromBaseFeeSwap = balanceOfToken1After -
-            balanceOfToken1Before;
+        uint256 outputFromBaseFeeSwap = balanceOfToken1After - balanceOfToken1Before;
 
         assertGt(balanceOfToken1After, balanceOfToken1Before);
 
@@ -119,8 +113,7 @@ contract TestGasPriceFeesHook is Test, Deployers {
         swapRouter.swap(key, params, testSettings, ZERO_BYTES);
         balanceOfToken1After = currency1.balanceOfSelf();
 
-        uint256 outputFromIncreasedFeeSwap = balanceOfToken1After -
-            balanceOfToken1Before;
+        uint256 outputFromIncreasedFeeSwap = balanceOfToken1After - balanceOfToken1Before;
 
         assertGt(balanceOfToken1After, balanceOfToken1Before);
 
@@ -142,8 +135,7 @@ contract TestGasPriceFeesHook is Test, Deployers {
         swapRouter.swap(key, params, testSettings, ZERO_BYTES);
         balanceOfToken1After = currency1.balanceOfSelf();
 
-        uint outputFromDecreasedFeeSwap = balanceOfToken1After -
-            balanceOfToken1Before;
+        uint256 outputFromDecreasedFeeSwap = balanceOfToken1After - balanceOfToken1Before;
 
         assertGt(balanceOfToken1After, balanceOfToken1Before);
 

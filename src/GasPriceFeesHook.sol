@@ -25,96 +25,77 @@ contract GasPriceFeesHook is BaseHook {
 
     // Initialize BaseHook parent contract in the constructor
     constructor(IPoolManager _poolManager) BaseHook(_poolManager) {
-      updateMovingAverage();
+        updateMovingAverage();
     }
 
     // Required override function for BaseHook to let the PoolManager know which hooks are implemented
-    function getHookPermissions()
-        public
-        pure
+    function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
+        return Hooks.Permissions({
+            beforeInitialize: true,
+            afterInitialize: false,
+            beforeAddLiquidity: false,
+            beforeRemoveLiquidity: false,
+            afterAddLiquidity: false,
+            afterRemoveLiquidity: false,
+            beforeSwap: true,
+            afterSwap: true,
+            beforeDonate: false,
+            afterDonate: false,
+            beforeSwapReturnDelta: false,
+            afterSwapReturnDelta: false,
+            afterAddLiquidityReturnDelta: false,
+            afterRemoveLiquidityReturnDelta: false
+        });
+    }
+
+    function beforeInitialize(address, PoolKey calldata key, uint160) external pure override returns (bytes4) {
+        if (!key.fee.isDynamicFee()) revert MustUseDynamicFee();
+        return this.beforeInitialize.selector;
+    }
+
+    function beforeSwap(address, PoolKey calldata key, IPoolManager.SwapParams calldata, bytes calldata)
+        external
         override
-        returns (Hooks.Permissions memory)
+        onlyPoolManager
+        returns (bytes4, BeforeSwapDelta, uint24)
     {
-        return
-            Hooks.Permissions({
-                beforeInitialize: true,
-                afterInitialize: false,
-                beforeAddLiquidity: false,
-                beforeRemoveLiquidity: false,
-                afterAddLiquidity: false,
-                afterRemoveLiquidity: false,
-                beforeSwap: true,
-                afterSwap: true,
-                beforeDonate: false,
-                afterDonate: false,
-                beforeSwapReturnDelta: false,
-                afterSwapReturnDelta: false,
-                afterAddLiquidityReturnDelta: false,
-                afterRemoveLiquidityReturnDelta: false
-            });
+        uint24 fee = getFee();
+        poolManager.updateDynamicLPFee(key, fee);
+        return (this.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
     }
 
-    function beforeInitialize(
-        address,
-        PoolKey calldata key,
-        uint160
-    ) external pure override returns (bytes4) {
-      if (!key.fee.isDynamicFee()) revert MustUseDynamicFee();
-      return this.beforeInitialize.selector;
-    }
-
-    function beforeSwap(
-        address,
-        PoolKey calldata key,
-        IPoolManager.SwapParams calldata,
-        bytes calldata
-    )
-    external
-    override
-    onlyPoolManager 
-    returns (bytes4, BeforeSwapDelta, uint24)
+    function afterSwap(address, PoolKey calldata, IPoolManager.SwapParams calldata, BalanceDelta, bytes calldata)
+        external
+        override
+        returns (bytes4, int128)
     {
-      uint24 fee = getFee();
-      poolManager.updateDynamicLPFee(key, fee);
-      return (this.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
-    }
-
-    function afterSwap(
-      address,
-      PoolKey calldata,
-      IPoolManager.SwapParams calldata,
-      BalanceDelta,
-      bytes calldata
-    ) external override returns (bytes4, int128) {
-updateMovingAverage();
-    return (this.afterSwap.selector, 0);
+        updateMovingAverage();
+        return (this.afterSwap.selector, 0);
     }
 
     function getFee() internal view returns (uint24) {
-      uint128 gasPrice = uint128(tx.gasprice);
+        uint128 gasPrice = uint128(tx.gasprice);
 
-      // if gasPrice > movingAverageGasPrice * 1.1, then half the fees
-      if (gasPrice > (movingAverageGasPrice * 11) / 10) {
-        return BASE_FEE / 2;
-      }
+        // if gasPrice > movingAverageGasPrice * 1.1, then half the fees
+        if (gasPrice > (movingAverageGasPrice * 11) / 10) {
+            return BASE_FEE / 2;
+        }
 
-      // if gasPrice < movingAverageGasPrice * 0.9, then double the fees
-      if (gasPrice < (movingAverageGasPrice * 9) / 10) {
-        return BASE_FEE * 2;
-      }
+        // if gasPrice < movingAverageGasPrice * 0.9, then double the fees
+        if (gasPrice < (movingAverageGasPrice * 9) / 10) {
+            return BASE_FEE * 2;
+        }
 
-      return BASE_FEE;
+        return BASE_FEE;
     }
 
-
     function updateMovingAverage() internal {
-      uint128 gasPrice = uint128(tx.gasprice);
+        uint128 gasPrice = uint128(tx.gasprice);
 
-      // New Average = ((Old Average * # of Txns Tracked) + Current Gas Price) / (# of Txns Tracked + 1)
-      movingAverageGasPrice =
-        ((movingAverageGasPrice * movingAverageGasPriceCount) + gasPrice) /
-        (movingAverageGasPriceCount + 1);
+        // New Average = ((Old Average * # of Txns Tracked) + Current Gas Price) / (# of Txns Tracked + 1)
+        movingAverageGasPrice =
+            ((movingAverageGasPrice * movingAverageGasPriceCount) + gasPrice) / (movingAverageGasPriceCount + 1);
 
-      movingAverageGasPriceCount++;
+        movingAverageGasPriceCount++;
     }
 }
